@@ -3131,8 +3131,8 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
   ///
   /// Caller guarantees that this intrinsic does not access memory.
   ///
-  /// TODO: "horizontal"/"pairwise" intrinsics are often incorrectly matched by
-  ///       by this handler.
+  /// TODO: "horizontal"/"pairwise" and permutation intrinsics are often
+  ///       incorrectly matched by this handler.
   [[maybe_unused]] bool
   maybeHandleSimpleNomemIntrinsic(IntrinsicInst &I,
                                   unsigned int trailingFlags) {
@@ -4158,6 +4158,56 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
     setOrigin(&I, PtrSrcOrigin);
   }
 
+  // e.g.,
+  //   return value                            data         indices
+  //   <16 x i8>   @llvm.x86.ssse3.pshuf.b.128(<16 x i8>,   <16 x i8>)
+  //   <32 x i8>   @llvm.x86.avx2.pshuf.b     (<32 x i8>,   <32 x i8>)
+  //   <8 x i32>   @llvm.x86.avx2.permd       (<8 x i32>,   <8 x i32>)
+  //   <8 x float> @llvm.x86.avx2.permps      (<8 x float>, <8 x i32>)
+  void handleAVXPermute(IntrinsicInst &I) {
+    IRBuilder<> IRB(&I);
+
+    assert(I.getType()->isVectorTy());
+
+    assert(I.arg_size() == 2);
+    Value *Data = I.getArgOperand(0);
+    assert(Data->getType()->isVectorTy());
+
+    Value *Indices = I.getArgOperand(1);
+    assert(Indices->getType()->isVectorTy());
+    assert(Indices->getType()->isIntOrIntVectorTy());
+
+    assert(cast<FixedVectorType>(Data->getType())->getNumElements() ==
+           cast<FixedVectorType>(Indices->getType())->getNumElements());
+
+    // These subsume many of the earlier checks, but we keep the earlier checks
+    // for easier diagnostics.
+    assert(I.getType() == Data->getType());
+    assert(getShadowTy(Data) == getShadowTy(Indices));
+
+    // Indices must be fully initialized
+    insertShadowCheck(I.getArgOperand(1), &I);
+
+    // LLVM ShuffleVector requires constant indices, hence we use the AVX
+    // shuffle instead.
+    Intrinsic::ID ShadowIntrinsicID = I.getIntrinsicID();
+    // Use avx2_permd because the shadow is a vector of integers.
+    if (ShadowIntrinsicID == Intrinsic::x86_avx2_permps)
+      ShadowIntrinsicID = Intrinsic::x86_avx2_permd;
+
+    auto *DataShadow = getShadow(Data);
+    CallInst *ShadowCI = IRB.CreateIntrinsic(getShadowTy(&I), ShadowIntrinsicID,
+                                             {DataShadow, Indices});
+    setShadow(&I, ShadowCI);
+
+    if (!MS.TrackOrigins)
+      return;
+
+    // getOrigin(&I, 0) returns a single origin value, not a vector, hence
+    // there is no fine-grained shuffling that we can do.
+    setOrigin(&I, getOrigin(&I, 0));
+  }
+
   // Instrument BMI / BMI2 intrinsics.
   // All of these intrinsics are Z = I(X, Y)
   // where the types of all operands and the result match, and are either i32 or
@@ -5031,6 +5081,14 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
       [[maybe_unused]] bool Success =
           maybeHandleSimpleNomemIntrinsic(I, /*trailingFlags=*/1);
       assert(Success);
+      break;
+    }
+
+    case Intrinsic::x86_ssse3_pshuf_b_128:
+    case Intrinsic::x86_avx2_pshuf_b:
+    case Intrinsic::x86_avx2_permd:
+    case Intrinsic::x86_avx2_permps: {
+      handleAVXPermute(I);
       break;
     }
 
