@@ -19,9 +19,7 @@ my $kMetaShadowSize = 4;
 my $kCompressedAddrBits = 44;
 
 my $TEST_QUALITY = 256;
-$TEST_QUALITY = 65536;
-
-my $configuration = "";
+#$TEST_QUALITY = 65536;
 
 my $kBrokenMapping        = $FALSE;
 my $kBrokenReverseMapping = $FALSE;
@@ -41,9 +39,38 @@ my ($kLoAppMemBeg, $kLoAppMemEnd,
 my ($kMetaShadowOr);
 my ($kMetaShadowMskOverride);
 
-my $configuration = "x86_64 (47-bit userspace, updated)";
 my %parameters
     = (
+          "x86_64 (47-bit userspace, GPU carveout)"
+       => {
+           kLoAppMemBeg   => 0x000000001000,
+           kLoAppMemEnd   => 0x020000000000,
+
+           # GPU:            0x100000000000
+           #               - 0x158800001000
+
+#         $kShadowBeg        0x100000000000
+#         $kShadowEnd        0x300000000000
+           kMetaShadowOr  => 0x400000000000,
+#         $kMetaShadowEnd => 0x380000000000;
+
+
+           kMidAppMemBeg  => 0x550000000000,
+           kMidAppMemEnd  => 0x5a0000000000,
+
+           kHeapMemBeg    => 0x720000000000,
+           kHeapMemEnd    => 0x730000000000,
+
+           kHiAppMemBeg   => 0x7a0000000000,
+           kHiAppMemEnd   => 0x800000000000,
+
+           kShadowMsk     => 0x700000000000,
+           kShadowXor     => 0x000000000000,
+           kShadowAdd     => 0x200000000000
+
+#    $kVdsoBeg       => 0xf000000000000000;
+          },
+
            "x86_64 (no low app region)"
        => {
            kMetaShadowOr => 0x000000000000,
@@ -95,6 +122,64 @@ my %parameters
 
 #    $kVdsoBeg       => 0xf000000000000000;
           },
+
+          "x86_64 (46-bit userspace, updated)"
+       => {
+#           kMetaShadowOr  => 0x180000000000,
+           kMetaShadowOr  => 0x200000000000,
+
+#    $kMetaShadowEnd => 0x340000000000;
+
+#    $kShadowBeg     => 0x010000000000;
+#    $kShadowEnd     => 0x100000000000;
+
+           kLoAppMemBeg   => 0x000000001000,
+           kLoAppMemEnd   => 0x020000000000,
+
+           kMidAppMemBeg  => 0x2a0000000000,
+           kMidAppMemEnd  => 0x2c0000000000,
+
+           # Heap must use hi mem formula
+           kHeapMemBeg    => 0x3C0000000000,
+           kHeapMemEnd    => 0x3D0000000000,
+
+           kHiAppMemBeg   => 0x3E0000000000,
+           kHiAppMemEnd   => 0x400000000000,
+
+           kShadowMsk     => 0x380000000000,
+           kShadowXor     => 0x000000000000,
+           kShadowAdd     => 0x020000000000
+
+#    $kVdsoBeg       => 0xf000000000000000;
+          },
+
+          "x86_64 (46-bit userspace, v0)" # BROKEN
+       => {
+           kMetaShadowOr  => 0x180000000000,
+#    $kMetaShadowEnd => 0x340000000000;
+
+#    $kShadowBeg     => 0x010000000000;
+#    $kShadowEnd     => 0x100000000000;
+
+           kLoAppMemBeg   => 0x000000001000,
+           kLoAppMemEnd   => 0x020000000000,
+
+           kMidAppMemBeg  => 0x2a0000000000,
+           kMidAppMemEnd  => 0x2c0000000000,
+
+           kHeapMemBeg    => 0x3C0000000000,
+           kHeapMemEnd    => 0x3D0000000000,
+
+           kHiAppMemBeg   => 0x3E0000000000,
+           kHiAppMemEnd   => 0x400000000000,
+
+           kShadowMsk     => 0x300000000000,
+           kShadowXor     => 0x000000000000,
+           kShadowAdd     => 0x080000000000
+
+#    $kVdsoBeg       => 0xf000000000000000;
+          },
+
            "aarch64, 48-bit VMA (prior to 1/9/23)"
        => {
            kLoAppMemBeg   => 0x0000000001000,
@@ -308,6 +393,30 @@ my %parameters
 
 #           kVdsoBeg       => 0x37f00000000,
           },
+
+           "aarch64, 39-bit VMA (v3)"
+       => {
+           kLoAppMemBeg   => 0x0000001000,
+           kLoAppMemEnd   => 0x2000000000,
+
+           kMetaShadowOr  => 0x3000000000,
+
+           kMidAppMemBeg  => 0x5500000000,
+           kMidAppMemEnd  => 0x5a00000000,
+
+           kHeapMemBeg    => 0x7200000000,
+           kHeapMemEnd    => 0x7300000000,
+
+           kHiAppMemBeg   => 0x7a00000000,
+           kHiAppMemEnd   => 0x8000000000,
+
+           kShadowMsk     => 0x7000000000,
+           kShadowXor     => 0x0000000000,
+           kShadowAdd     => 0x2000000000
+
+#           kVdsoBeg       => 0x7f00000000,
+          },
+
            "aarch64, 39-bit VMA (updated)"
        => {
            kLoAppMemBeg   => 0x0000001000,
@@ -330,6 +439,7 @@ my %parameters
 
 #           kVdsoBeg       => 0x7f00000000,
           },
+
            "aarch64, 39-bit VMA"
        => {
            kLoAppMemBeg   => 0x0000001000,
@@ -351,8 +461,100 @@ my %parameters
            kShadowAdd     => 0x0000000000
 
 #           kVdsoBeg       => 0x7f00000000,
+          },
+
+           "riscv64, 48-bit VMA"
+       => {
+           kMetaShadowOr  => 0x400000000000,
+#          kMetaShadowEnd => 0x480000000000;
+
+#          kShadowBeg     => 0x200000000000;
+#          kShadowEnd     => 0x400000000000;
+
+           kLoAppMemBeg   => 0x000000001000,
+           kLoAppMemEnd   => 0x040000000000,
+
+           kMidAppMemBeg  => 0x555555555000,
+           kMidAppMemEnd  => 0x5a0000000000,
+
+           kHeapMemBeg    => 0x5a0000000000,
+           kHeapMemEnd    => 0x5a0000000000,
+
+           kHiAppMemBeg   => 0x7a0000000000,
+           kHiAppMemEnd   => 0x7fffffffffff,
+
+           kShadowMsk     => 0x700000000000,
+           kShadowXor     => 0x100000000000,
+           kShadowAdd     => 0x000000000000
+
+#    $kVdsoBeg       => 0xf000000000000000;
+          },
+
+           "Go, riscv64, 39-bit VMA"
+       => {
+           kMetaShadowOr  => 0x003500000000,
+#          kMetaShadowEnd => 0x003900000000,
+
+           kShadowBeg     => 0x000c00000000,
+           kShadowEnd     => 0x003400000000,
+
+           kLoAppMemBeg   => 0x000000001000,
+           kLoAppMemEnd   => 0x000a00000000,
+
+           kMidAppMemBeg  => 0x0,
+           kMidAppMemEnd  => 0x0,
+
+           kHeapMemBeg    => 0x0,
+           kHeapMemEnd    => 0x0,
+
+           kHiAppMemBeg   => 0x0,
+           kHiAppMemEnd   => 0x0,
+
+           kShadowMsk     => 0x0,
+           kShadowXor     => 0x0,
+           kShadowAdd     => 0x000c00000000
+
+#    $kVdsoBeg       => 0xf000000000000000;
+          },
+
+           "Go, riscv64, 48-bit VMA"
+       => {
+           kMetaShadowOr  => 0x300000000000,
+#          kMetaShadowEnd => 0x480000000000,
+
+           kShadowBeg     => 0x200000000000,
+           kShadowEnd     => 0x240000000000,
+
+           kLoAppMemBeg   => 0x000000001000,
+           kLoAppMemEnd   => 0x00e000000000,
+
+           kMidAppMemBeg  => 0x0,
+           kMidAppMemEnd  => 0x0,
+
+           kHeapMemBeg    => 0x0,
+           kHeapMemEnd    => 0x0,
+
+           kHiAppMemBeg   => 0x0,
+           kHiAppMemEnd   => 0x0,
+
+           kShadowMsk     => 0x0,
+           kShadowXor     => 0x0,
+           kShadowAdd     => 0x200000000000
+
+#    $kVdsoBeg       => 0xf000000000000000;
           }
       );
+
+my $configuration = "x86_64 (47-bit userspace, updated)";
+$configuration = "riscv64, 48-bit VMA";
+$configuration = "x86_64 (47-bit userspace, GPU carveout)";
+$configuration = "x86_64 (46-bit userspace, updated)";
+#$configuration = "x86_64 (46-bit userspace, v0)";
+$configuration = "aarch64, 39-bit VMA (v3)";
+#$configuration = "x86_64 (47-bit userspace, updated)";
+$configuration = "aarch64, 39-bit VMA (updated)";
+$configuration = "Go, riscv64, 48-bit VMA";
+$configuration = "Go, riscv64, 39-bit VMA";
 
 if (! defined $parameters {$configuration}) {
     print "Known configurations:\n";
@@ -363,12 +565,6 @@ if (! defined $parameters {$configuration}) {
     die "Unknown configuration '$configuration'!\n";
 }
 
-my ($kLoAppMemBeg, $kLoAppMemEnd,
-    $kMetaShadowOr,
-    $kMidAppMemBeg, $kMidAppMemEnd,
-    $kHeapMemBeg, $kHeapMemEnd,
-    $kHiAppMemBeg, $kHiAppMemEnd,
-    $kShadowMsk, $kShadowXor, $kShadowAdd);
 foreach my $param (qw (kLoAppMemBeg kLoAppMemEnd
                        kMetaShadowOr
                        kMidAppMemBeg kMidAppMemEnd
@@ -440,6 +636,7 @@ sub shadowToMem ($) {
     if (   ($p >= $kLoAppMemBeg)
         && ($p < $kLoAppMemEnd) # Open interval
         && (memToShadow ($p) == $sp)) {
+#        printf STDERR "0x%012x in low: 0x%012x\n", $sp, $p;
         return $p;
     }
     if ($kMidAppMemBeg) {
@@ -447,10 +644,12 @@ sub shadowToMem ($) {
         if (   ($p_mid >= $kMidAppMemBeg)
             && ($p_mid < $kMidAppMemEnd) # Open interval
             && (memToShadow ($p_mid) == $sp)) {
+#            printf STDERR "0x%012x in mid: 0x%012x\n", $sp, $p_mid;
             return $p_mid;
         }
     }
 
+#    printf STDERR "0x%012x in high: 0x%012x\n", $sp, $p | $kShadowMsk;
     return $p | $kShadowMsk;
 }
 
@@ -492,7 +691,7 @@ sub restoreAddrImpl ($) {
 
     # 1111 + 40 zero bits
     # Indicator was changed from 3 bits to 4 bits in https://reviews.llvm.org/D145214
-    my $indicator = 0x0f0000000000;
+    my $indicator = 0x0e0000000000;
     my $ind_lsb = 1 << leastSignificantSetBitIndex ($indicator);
 
     my @matches = ();
@@ -519,6 +718,8 @@ sub restoreAddrImpl ($) {
 
                 if (@matches == 0 || ($restored != $matches [0])) {
                     push @matches, [$restored, $beg, $end, $label];
+
+#                    printf STDERR "0x%x 0x%x\n", $addr, compressAddr ($restored);
 
                     die "Compress/restore addr function is not invertible!\n"
                         unless compressAddr ($restored) == $addr;
@@ -617,6 +818,12 @@ $kMetaShadowMskOverride = $kShadowMsk unless defined $kMetaShadowMskOverride;
 # assumption holds if the low app region starts at zero, while the high
 # app region starts at the top of the address space.
 die "Need to change shadowToMem here and in tsan library (low app incompatible)!\n"
+    . sprintf ("0x%012x 0x%012x 0x%012x 0x%0x12\n",
+               ($kLoAppMemBeg & ~$kShadowMsk),
+               $kLoAppMemBeg,
+               (($kLoAppMemEnd - 1) & ~$kShadowMsk),
+               $kLoAppMemEnd - 1
+              )
     unless (    (($kLoAppMemBeg & ~$kShadowMsk) == ($kLoAppMemBeg))
             && ((($kLoAppMemEnd - 1) & ~$kShadowMsk) == ($kLoAppMemEnd - 1)))
            || ($kLoAppMemBeg == $kLoAppMemEnd);
@@ -733,8 +940,10 @@ foreach my $mappingRef (@memMappings) {
 
          # compiler-rt/lib/tsan/tests/unit/tsan_shadow_test.cpp::TestRegion
          if (1) {
+#             printf ("Checking region [0x%x-0x%x)\n", $start, $end);
+
              my $prev = 0;
-             for (my $p0 = $start; $p0 <= $end; $p0 += ($end - $start) / $TEST_QUALITY) {
+             for (my $p0 = $start; $p0 <= $end; $p0 += int (($end - $start) / $TEST_QUALITY)) {
                  foreach (my $x = -$kShadowCell; $x <= $kShadowCell; $x += $kShadowCell) {
                      my $p = roundDown ($p0 + $x, $kShadowCell);
 
@@ -743,6 +952,8 @@ foreach my $mappingRef (@memMappings) {
                      my $s = memToShadow ($p);
                      my $m = memToMeta ($p);
                      my $r = shadowToMem ($s);
+                     printf ("[$i] addr=0x%x: shadow=0x%x meta=0x%x reverse=0x%x\n",
+                             $p, $s, $m, $r);
 
                      die (sprintf ("p = 0x%012x is not app memory!\n", $p))
                          unless isAppMem ($p);
@@ -754,15 +965,15 @@ foreach my $mappingRef (@memMappings) {
                                    $p, compressAddr ($p), restoreAddrImpl (compressAddr ($p)))),
                          unless $p == restoreAddrImpl (compressAddr ($p));
 
-                     die (sprintf "kBrokenReverseMapping: p=0x%012x, s=0x%012x, r=0x%012x\n",
-                                  $p, $s, $r) unless $kBrokenReverseMapping || ($p == $r);
+                     die (sprintf "kBrokenReverseMapping: p=0x%012x, s=0x%012x, r=0x%012x; compressAddr(p) = 0x%012x, restoreAddr = 0x%012x\n",
+                                  $p, $s, $r, compressAddr ($p), restoreAddrImpl (compressAddr ($p))) unless $kBrokenReverseMapping || ($p == $r);
 
                      # kBrokenLinearity test
                      if ($prev && !$kBrokenLinearity) {
                          my $prev_s = memToShadow ($prev);
                          my $prev_m = memToMeta ($prev);
 
-                         die (sprintf "Monotonicity violated for 0x%x (shadow 0x%x; prev 0x%x; prev shadow: 0x%x)\n",
+                         die (sprintf "Monotonicity violated for address 0x%x (shadow 0x%x; prev address 0x%x; prev shadow: 0x%x)\n",
                                       $p, $s, $prev, $prev_s)
                              unless $kBrokenLinearity || (($s - $prev_s) == ($p - $prev) * $kShadowMultiplier);
 
@@ -829,10 +1040,12 @@ tryProtectRange ($shadowMetaMax1, $shadowMetaMin2, "ShadowMetaMax1", "ShadowMeta
 if ($kMidAppMemBeg != 0) {
     tryProtectRange ($shadowMetaMax2, $kMidAppMemBeg, "ShadowMetaMax2", "MidAppMemBeg");
     tryProtectRange ($kMidAppMemBeg, $kHeapMemBeg, "MidAppMemBeg", "HeapMemBeg");
-} else {
+} elsif ($kHeapMemBeg != 0) {
     tryProtectRange ($shadowMetaMax2, $kHeapMemBeg, "MetaMax", "HeapMemBeg");
 }
-tryProtectRange ($kHeapMemEnd, $kHiAppMemBeg, "HeapMemEnd", "HiAppMemBeg");
+if ($kHeapMemEnd != 0 && $kHiAppMemBeg != 0) {
+  tryProtectRange ($kHeapMemEnd, $kHiAppMemBeg, "HeapMemEnd", "HiAppMemBeg");
+}
 
 if (($kShadowAdd != 0) && ($kShadowXor != 0)) {
     print "\n";
