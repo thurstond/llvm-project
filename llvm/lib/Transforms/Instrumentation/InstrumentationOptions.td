@@ -459,6 +459,10 @@ defm : BoolField<"msan-dump-strict-instructions", "false",
   "Print out instructions with default strict semantics i.e.,check that all the inputs are fully initialized, and mark the output as fully initialized. These semantics are applied to instructions that could not be handled explicitly nor heuristically">;
 defm : OptionalBoolField<"msan-eager-checks",
   "Check arguments and return values at function call boundaries">;
+defm : EnumField<"msan-embed-faulting-instruction", "MSanEmbedFaultingInstructionMode", "MSanEmbedFaultingInstructionMode::None",
+  "none,name,full",
+  ["MSanEmbedFaultingInstructionMode::None", "MSanEmbedFaultingInstructionMode::Name", "MSanEmbedFaultingInstructionMode::Full"],
+  "[EXPERIMENTAL] Sets whether to embed the LLVM IR instruction info for each UUM check">;
 // When compiling the Linux kernel, we sometimes see false positives related to
 // MSan being unable to understand that inline assembly calls may initialize
 // local variables. This flag makes the compiler conservatively unpoison every

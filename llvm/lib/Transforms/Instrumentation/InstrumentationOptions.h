@@ -12,6 +12,7 @@
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/ProfileData/ProfCorrelatorKind.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizerOptions.h"
+#include "llvm/Transforms/Instrumentation/MemorySanitizer.h"
 #include <optional>
 
 namespace llvm {
