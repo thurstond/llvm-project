@@ -403,9 +403,11 @@ static inline void WarnIfPrintFaultingInstructionRequested() {
 }
 
 #define MSAN_MAYBE_WARNING_INSTNAME(type, size, instname)                    \
-  void __msan_maybe_warning_instname_##size(type s, u32 o, char *instname) { \
+  void __msan_maybe_warning_instname_##size(type s, u32 o, char* instname) { \
     GET_CALLER_PC_BP;                                                        \
     if (UNLIKELY(s)) {                                                       \
+      if (Verbosity() >= 1)                                                  \
+        print_shadow_value((void*)(&s), sizeof(s));                          \
       if (instname)                                                          \
         PrintFaultingInstructionIfRequested(instname);                       \
       PrintWarningWithOrigin(pc, bp, o);                                     \
@@ -442,6 +444,31 @@ void __msan_maybe_warning_N(void *shadow, u64 size, u32 o) {
   if (UNLIKELY(!allZero)) {
     if (Verbosity() >= 1)
       print_shadow_value(shadow, size);
+    PrintWarningWithOrigin(pc, bp, o);
+    if (__msan::flags()->halt_on_error) {
+      Printf("Exiting\n");
+      Die();
+    }
+  }
+}
+
+void __msan_maybe_warning_instname_N(void* shadow, u64 size, u32 o,
+                                     char* instname) {
+  GET_CALLER_PC_BP;
+
+  bool allZero = true;
+  for (unsigned int i = 0; i < size; i++) {
+    if (((char*)shadow)[i]) {
+      allZero = false;
+      break;
+    }
+  }
+
+  if (UNLIKELY(!allZero)) {
+    if (Verbosity() >= 1)
+      print_shadow_value(shadow, size);
+    if (instname)
+      PrintFaultingInstructionIfRequested(instname);
     PrintWarningWithOrigin(pc, bp, o);
     if (__msan::flags()->halt_on_error) {
       Printf("Exiting\n");
