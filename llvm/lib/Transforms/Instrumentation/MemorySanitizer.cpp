@@ -957,7 +957,7 @@ void MemorySanitizer::createUserspaceApi(Module &M,
   StringRef WarningFnName = getWarningFnName(
       TrackOrigins, Recover,
       ClEmbedFaultingInst != MSanEmbedFaultingInstructionMode::None);
-  SmallVector<Type *, 2> ArgsTy = {};
+  SmallVector<Type *, 4> ArgsTy = {};
   if (TrackOrigins) {
     ArgsTy.push_back(IRB.getInt32Ty());
     if (ClEmbedFaultingInst != MSanEmbedFaultingInstructionMode::None)
@@ -998,31 +998,36 @@ void MemorySanitizer::createUserspaceApi(Module &M,
   VAArgOverflowSizeTLS = getOrInsertGlobal(M, "__msan_va_arg_overflow_size_tls",
                                            IRB.getIntPtrTy(M.getDataLayout()));
 
+  std::string FunctionNamePrefix = "__msan_maybe_warning_";
+  SmallVector<Type *, 4> ArgsNTy = {PtrTy, IRB.getInt64Ty(), IRB.getInt32Ty()};
+  if (ClEmbedFaultingInst != MSanEmbedFaultingInstructionMode::None) {
+    FunctionNamePrefix = "__msan_maybe_warning_instname_";
+    ArgsNTy.push_back(IRB.getPtrTy());
+  }
+
   for (size_t AccessSizeIndex = 0; AccessSizeIndex < kNumberOfAccessSizes;
        AccessSizeIndex++) {
     unsigned AccessSize = 1 << AccessSizeIndex;
-    std::string FunctionName = "__msan_maybe_warning_" + itostr(AccessSize);
-    SmallVector<Type *, 3> ArgsTy = {IRB.getIntNTy(AccessSize * 8),
-                                     IRB.getInt32Ty()};
-    if (ClEmbedFaultingInst != MSanEmbedFaultingInstructionMode::None) {
-      FunctionName = "__msan_maybe_warning_instname_" + itostr(AccessSize);
+
+    ArgsTy = {IRB.getIntNTy(AccessSize * 8), IRB.getInt32Ty()};
+    if (ClEmbedFaultingInst != MSanEmbedFaultingInstructionMode::None)
       ArgsTy.push_back(IRB.getPtrTy());
-    }
-    MaybeWarningFn[AccessSizeIndex] = M.getOrInsertFunction(
-        FunctionName, FunctionType::get(IRB.getVoidTy(), ArgsTy, false),
-        TLI.getAttrList(C, {0, 1}, /*Signed=*/false));
 
-    MaybeWarningVarSizeFn = M.getOrInsertFunction(
-        "__msan_maybe_warning_N", TLI.getAttrList(C, {}, /*Signed=*/false),
-        IRB.getVoidTy(), PtrTy, IRB.getInt64Ty(), IRB.getInt32Ty());
-    // TODO: support ClEmbedFaultingInst with var size shadow
+    MaybeWarningFn[AccessSizeIndex] =
+        M.getOrInsertFunction(FunctionNamePrefix + itostr(AccessSize),
+                              FunctionType::get(IRB.getVoidTy(), ArgsTy, false),
+                              TLI.getAttrList(C, {0, 1}, /*Signed=*/false));
 
-    FunctionName = "__msan_maybe_store_origin_" + itostr(AccessSize);
     MaybeStoreOriginFn[AccessSizeIndex] = M.getOrInsertFunction(
-        FunctionName, TLI.getAttrList(C, {0, 2}, /*Signed=*/false),
-        IRB.getVoidTy(), IRB.getIntNTy(AccessSize * 8), PtrTy,
-        IRB.getInt32Ty());
+        "__msan_maybe_store_origin_" + itostr(AccessSize),
+        TLI.getAttrList(C, {0, 2}, /*Signed=*/false), IRB.getVoidTy(),
+        IRB.getIntNTy(AccessSize * 8), PtrTy, IRB.getInt32Ty());
   }
+
+  MaybeWarningVarSizeFn =
+      M.getOrInsertFunction(FunctionNamePrefix + "N",
+                            FunctionType::get(IRB.getVoidTy(), ArgsNTy, false),
+                            TLI.getAttrList(C, {}, /*Signed=*/false));
 
   MsanSetAllocaOriginWithDescriptionFn =
       M.getOrInsertFunction("__msan_set_alloca_origin_with_descr",
@@ -1548,15 +1553,17 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
         FunctionCallee Fn = MS.MaybeWarningVarSizeFn;
         Value *ShadowAlloca = IRB.CreateAlloca(ConvertedShadow2->getType(), 0u);
         IRB.CreateStore(ConvertedShadow2, ShadowAlloca);
+
         unsigned ShadowSize = DL.getTypeAllocSize(ConvertedShadow2->getType());
-        CallBase *CB = IRB.CreateCall(
-            Fn,
-            {ShadowAlloca, ConstantInt::get(IRB.getInt64Ty(), ShadowSize),
-             MS.TrackOrigins && Origin ? Origin : (Value *)IRB.getInt32(0)});
+        SmallVector<Value *, 4> Args = {
+            ShadowAlloca, ConstantInt::get(IRB.getInt64Ty(), ShadowSize),
+            MS.TrackOrigins && Origin ? Origin : (Value *)IRB.getInt32(0)};
+        if (ClEmbedFaultingInst != MSanEmbedFaultingInstructionMode::None)
+          Args.push_back(InstName);
+
+        CallBase *CB = IRB.CreateCall(Fn, Args);
         CB->addParamAttr(1, Attribute::ZExt);
         CB->addParamAttr(2, Attribute::ZExt);
-
-        // TODO: support ClEmbedFaultingInst with var size shadow
       }
     } else {
       Value *Cmp = convertToBool(ConvertedShadow, IRB, "_mscmp");
